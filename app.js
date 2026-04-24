@@ -2,26 +2,105 @@
 
 const fileInput = document.getElementById("fileInput");
 const loadDemoBtn = document.getElementById("loadDemoBtn");
+const langToggleBtn = document.getElementById("langToggleBtn");
 const chatEl = document.getElementById("chat");
 const metaEl = document.getElementById("meta");
+const languageContentMap = {
+  zh: {
+    title: "JSONL 对话查看器",
+    loadDemo: "加载 docs 示例",
+    langToggle: "English",
+    metaSelectFile: "请选择一个 JSONL 文件。",
+    emptyWaiting: "等待加载文件...",
+    source: "来源",
+    totalLines: "总行数",
+    messages: "可展示消息",
+    parseFailed: "解析失败",
+    demoReadFailed: "示例文件读取失败",
+    demoLoadFailed: "加载示例失败",
+    noMessages: "没有可展示的消息。",
+    unknownTool: "未知工具",
+    toolCall: "工具调用",
+    params: "参数",
+    toolResult: "工具返回",
+    errorSuffix: " (错误)",
+    toolResultSimple: "工具结果",
+    noVisualText: "无可视文本内容",
+    expand: "展开",
+    collapse: "折叠",
+    roleUser: "用户",
+    roleAssistant: "助手",
+    roleTool: "工具",
+    roleSystem: "系统",
+  },
+  en: {
+    title: "JSONL Conversation Viewer",
+    loadDemo: "Load docs demo",
+    langToggle: "中文",
+    metaSelectFile: "Please choose a JSONL file.",
+    emptyWaiting: "Waiting for file...",
+    source: "Source",
+    totalLines: "Total lines",
+    messages: "Displayable messages",
+    parseFailed: "Parse failures",
+    demoReadFailed: "Failed to read demo file",
+    demoLoadFailed: "Failed to load demo",
+    noMessages: "No messages to display.",
+    unknownTool: "UnknownTool",
+    toolCall: "Tool call",
+    params: "Arguments",
+    toolResult: "Tool result",
+    errorSuffix: " (error)",
+    toolResultSimple: "Tool output",
+    noVisualText: "No visible text content",
+    expand: "Expand",
+    collapse: "Collapse",
+    roleUser: "User",
+    roleAssistant: "Assistant",
+    roleTool: "Tool",
+    roleSystem: "System",
+  },
+};
+let currentLang = "zh";
+let languageContent = languageContentMap[currentLang];
+let latestSourceText = "";
+let latestSourceName = "";
+let latestRows = [];
+
+applyLanguage();
 
 fileInput.addEventListener("change", async (event) => {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
   const text = await file.text();
-  renderFromText(text, file.name);
+  latestSourceText = text;
+  latestSourceName = file.name;
+  renderFromText(latestSourceText, latestSourceName);
 });
 
 loadDemoBtn.addEventListener("click", async () => {
   try {
     const res = await fetch("./docs/talent-labeler-batch-processing_claude.jsonl");
     if (!res.ok) {
-      throw new Error("示例文件读取失败");
+      throw new Error(t("demoReadFailed"));
     }
     const text = await res.text();
-    renderFromText(text, "docs/talent-labeler-batch-processing_claude.jsonl");
+    latestSourceText = text;
+    latestSourceName = "docs/talent-labeler-batch-processing_claude.jsonl";
+    renderFromText(latestSourceText, latestSourceName);
   } catch (err) {
-    setEmpty(`加载示例失败：${err.message}`);
+    setEmpty(`${t("demoLoadFailed")}: ${err.message}`);
+  }
+});
+
+langToggleBtn.addEventListener("click", () => {
+  currentLang = currentLang === "zh" ? "en" : "zh";
+  languageContent = languageContentMap[currentLang];
+  applyLanguage();
+  if (latestSourceText) {
+    renderFromText(latestSourceText, latestSourceName);
+  } else {
+    setEmpty(t("emptyWaiting"));
   }
 });
 
@@ -40,8 +119,9 @@ function renderFromText(text, sourceName) {
   }
 
   const messageItems = normalizeEvents(events);
+  latestRows = messageItems;
   renderMessages(messageItems);
-  metaEl.textContent = `来源: ${sourceName} | 总行数: ${lines.length} | 可展示消息: ${messageItems.length} | 解析失败: ${parseErrorCount}`;
+  metaEl.textContent = `${t("source")}: ${sourceName} | ${t("totalLines")}: ${lines.length} | ${t("messages")}: ${messageItems.length} | ${t("parseFailed")}: ${parseErrorCount}`;
 }
 
 function normalizeEvents(events) {
@@ -56,7 +136,7 @@ function normalizeEvents(events) {
       if (event.type && event.type !== "file-history-snapshot") {
         rows.push({
           role: "system",
-          text: `[${event.type}] 无可视文本内容`,
+          text: `[${event.type}] ${t("noVisualText")}`,
           isTool: false,
         });
       }
@@ -112,7 +192,7 @@ function extractTextChunks(event) {
   if (event.toolUseResult) {
     chunks.push({
       role: "tool",
-      text: "工具结果:\n" + safeJson(event.toolUseResult),
+      text: `${t("toolResultSimple")}:\n` + safeJson(event.toolUseResult),
       isTool: true,
     });
   }
@@ -126,15 +206,15 @@ function extractTextChunks(event) {
 }
 
 function formatToolUse(part) {
-  const name = part.name || "UnknownTool";
+  const name = part.name || t("unknownTool");
   const input = part.input ? safeJson(part.input) : "{}";
-  return `工具调用: ${name}\n参数:\n${input}`;
+  return `${t("toolCall")}: ${name}\n${t("params")}:\n${input}`;
 }
 
 function formatToolResult(part) {
   const content = typeof part.content === "string" ? part.content : safeJson(part.content);
-  const isError = part.is_error ? " (错误)" : "";
-  return `工具返回${isError}:\n${content}`;
+  const isError = part.is_error ? t("errorSuffix") : "";
+  return `${t("toolResult")}${isError}:\n${content}`;
 }
 
 function safeJson(value) {
@@ -147,7 +227,7 @@ function safeJson(value) {
 
 function renderMessages(items) {
   if (!items.length) {
-    setEmpty("没有可展示的消息。");
+    setEmpty(t("noMessages"));
     return;
   }
 
@@ -178,10 +258,10 @@ function renderMessages(items) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "toggle-btn";
-      button.textContent = "展开";
+      button.textContent = t("expand");
       button.addEventListener("click", () => {
         const isCollapsed = content.classList.toggle("collapsed");
-        button.textContent = isCollapsed ? "展开" : "折叠";
+        button.textContent = isCollapsed ? t("expand") : t("collapse");
       });
       header.appendChild(button);
     }
@@ -218,10 +298,10 @@ function decodeEscapedSequences(text) {
 }
 
 function roleLabel(role) {
-  if (role === "user") return "用户";
-  if (role === "assistant") return "助手";
-  if (role === "tool") return "工具";
-  return "系统";
+  if (role === "user") return t("roleUser");
+  if (role === "assistant") return t("roleAssistant");
+  if (role === "tool") return t("roleTool");
+  return t("roleSystem");
 }
 
 function setEmpty(text) {
@@ -235,4 +315,22 @@ function escapeHtml(text) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function t(key) {
+  return languageContent[key] || key;
+}
+
+function applyLanguage() {
+  document.documentElement.lang = currentLang === "zh" ? "zh-CN" : "en";
+  document.title = t("title");
+  loadDemoBtn.textContent = t("loadDemo");
+  langToggleBtn.textContent = t("langToggle");
+  if (latestSourceText) {
+    metaEl.textContent = metaEl.textContent;
+    renderMessages(latestRows);
+  } else {
+    metaEl.textContent = t("metaSelectFile");
+    setEmpty(t("emptyWaiting"));
+  }
 }
