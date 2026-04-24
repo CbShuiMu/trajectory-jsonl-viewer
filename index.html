@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JSONL 对话查看器</title>
+    <style>
+      :root {
+        --bg: #f5f7fb;
+        --panel: #ffffff;
+        --line: #dfe3eb;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --user-bg: #2563eb;
+        --assistant-bg: #ffffff;
+        --tool-bg: #fff7ed;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      .container {
+        width: min(1100px, 96vw);
+        margin: 24px auto;
+      }
+      .header {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px;
+        margin-bottom: 14px;
+        display: grid;
+        gap: 10px;
+      }
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .meta {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      #chat {
+        display: grid;
+        gap: 10px;
+      }
+      .row {
+        display: flex;
+        width: 100%;
+      }
+      .row.left {
+        justify-content: flex-start;
+      }
+      .row.right {
+        justify-content: flex-end;
+      }
+      .bubble {
+        max-width: min(75%, 900px);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: var(--assistant-bg);
+      }
+      .row.right .bubble {
+        background: var(--user-bg);
+        color: #ffffff;
+        border-color: #1d4ed8;
+      }
+      .bubble.tool {
+        background: var(--tool-bg);
+      }
+      .bubble-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+      .bubble-header.right {
+        flex-direction: row-reverse;
+      }
+      .role {
+        font-size: 12px;
+        opacity: 0.85;
+      }
+      .row.right .role {
+        opacity: 0.9;
+      }
+      .content {
+        white-space: pre-wrap;
+        word-break: break-word;
+        line-height: 1.5;
+      }
+      .content.collapsed {
+        max-height: 210px;
+        overflow: hidden;
+      }
+      .toggle-btn {
+        border: 1px solid var(--line);
+        background: #f8fafc;
+        color: #374151;
+        font-size: 12px;
+        border-radius: 8px;
+        padding: 2px 8px;
+        cursor: pointer;
+      }
+      .row.right .toggle-btn {
+        background: rgba(255, 255, 255, 0.2);
+        border-color: rgba(255, 255, 255, 0.5);
+        color: #ffffff;
+      }
+      .empty {
+        padding: 30px;
+        text-align: center;
+        color: var(--muted);
+        background: var(--panel);
+        border: 1px dashed var(--line);
+        border-radius: 12px;
+      }
+      code {
+        font-family: Consolas, "Courier New", monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="controls">
+          <input id="fileInput" type="file" accept=".jsonl,.json" />
+          <button id="loadDemoBtn" type="button">加载 docs 示例</button>
+        </div>
+        <div id="meta" class="meta">请选择一个 JSONL 文件。</div>
+      </div>
+      <div id="chat">
+        <div class="empty">等待加载文件...</div>
+      </div>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>
