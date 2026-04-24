@@ -3,6 +3,9 @@
 const fileInput = document.getElementById("fileInput");
 const loadDemoBtn = document.getElementById("loadDemoBtn");
 const langToggleBtn = document.getElementById("langToggleBtn");
+const roleFilterLabelEl = document.getElementById("roleFilterLabel");
+const roleFilterEl = document.getElementById("roleFilter");
+const messageCountEl = document.getElementById("messageCount");
 const chatEl = document.getElementById("chat");
 const metaEl = document.getElementById("meta");
 const languageContentMap = {
@@ -15,6 +18,7 @@ const languageContentMap = {
     source: "来源",
     totalLines: "总行数",
     messages: "可展示消息",
+    visibleMessages: "当前显示",
     parseFailed: "解析失败",
     demoReadFailed: "示例文件读取失败",
     demoLoadFailed: "加载示例失败",
@@ -32,6 +36,8 @@ const languageContentMap = {
     roleAssistant: "助手",
     roleTool: "工具",
     roleSystem: "系统",
+    filterRole: "角色过滤",
+    filterAll: "全部",
   },
   en: {
     title: "JSONL Conversation Viewer",
@@ -42,6 +48,7 @@ const languageContentMap = {
     source: "Source",
     totalLines: "Total lines",
     messages: "Displayable messages",
+    visibleMessages: "Visible",
     parseFailed: "Parse failures",
     demoReadFailed: "Failed to read demo file",
     demoLoadFailed: "Failed to load demo",
@@ -59,6 +66,8 @@ const languageContentMap = {
     roleAssistant: "Assistant",
     roleTool: "Tool",
     roleSystem: "System",
+    filterRole: "Role filter",
+    filterAll: "All",
   },
 };
 let currentLang = "zh";
@@ -66,6 +75,8 @@ let languageContent = languageContentMap[currentLang];
 let latestSourceText = "";
 let latestSourceName = "";
 let latestRows = [];
+let currentRoleFilter = "all";
+let availableRoles = [];
 
 applyLanguage();
 
@@ -91,6 +102,11 @@ loadDemoBtn.addEventListener("click", async () => {
   } catch (err) {
     setEmpty(`${t("demoLoadFailed")}: ${err.message}`);
   }
+});
+
+roleFilterEl.addEventListener("change", () => {
+  currentRoleFilter = roleFilterEl.value || "all";
+  renderMessages(latestRows);
 });
 
 langToggleBtn.addEventListener("click", () => {
@@ -120,6 +136,11 @@ function renderFromText(text, sourceName) {
 
   const messageItems = normalizeEvents(events);
   latestRows = messageItems;
+  availableRoles = extractAvailableRoles(messageItems);
+  if (currentRoleFilter !== "all" && !availableRoles.includes(currentRoleFilter)) {
+    currentRoleFilter = "all";
+  }
+  updateRoleFilterOptions();
   renderMessages(messageItems);
   metaEl.textContent = `${t("source")}: ${sourceName} | ${t("totalLines")}: ${lines.length} | ${t("messages")}: ${messageItems.length} | ${t("parseFailed")}: ${parseErrorCount}`;
 }
@@ -156,11 +177,16 @@ function normalizeEvents(events) {
 }
 
 function inferRole(event) {
-  if (event.type === "user") return "user";
-  if (event.type === "assistant") return "assistant";
+  if (typeof event.message?.role === "string" && event.message.role.trim()) {
+    return event.message.role.trim();
+  }
+  if (typeof event.role === "string" && event.role.trim()) {
+    return event.role.trim();
+  }
   if (event.type === "tool" || event.toolUseResult) return "tool";
-  if (event.message && event.message.role === "user") return "user";
-  if (event.message && event.message.role === "assistant") return "assistant";
+  if (event.type === "user" || event.type === "assistant" || event.type === "system") {
+    return event.type;
+  }
   return "system";
 }
 
@@ -226,13 +252,16 @@ function safeJson(value) {
 }
 
 function renderMessages(items) {
-  if (!items.length) {
+  const filteredItems = filterItemsByRole(items, currentRoleFilter);
+  updateMessageCount(filteredItems.length);
+
+  if (!filteredItems.length) {
     setEmpty(t("noMessages"));
     return;
   }
 
   chatEl.innerHTML = "";
-  for (const item of items) {
+  for (const item of filteredItems) {
     const row = document.createElement("div");
     const align = item.role === "user" ? "right" : "left";
     row.className = `row ${align}`;
@@ -301,7 +330,8 @@ function roleLabel(role) {
   if (role === "user") return t("roleUser");
   if (role === "assistant") return t("roleAssistant");
   if (role === "tool") return t("roleTool");
-  return t("roleSystem");
+  if (role === "system") return t("roleSystem");
+  return role;
 }
 
 function setEmpty(text) {
@@ -326,11 +356,49 @@ function applyLanguage() {
   document.title = t("title");
   loadDemoBtn.textContent = t("loadDemo");
   langToggleBtn.textContent = t("langToggle");
+  roleFilterLabelEl.textContent = t("filterRole");
+  updateRoleFilterOptions();
   if (latestSourceText) {
     metaEl.textContent = metaEl.textContent;
     renderMessages(latestRows);
   } else {
     metaEl.textContent = t("metaSelectFile");
     setEmpty(t("emptyWaiting"));
+    updateMessageCount(0);
   }
+}
+
+function filterItemsByRole(items, role) {
+  if (role === "all") return items;
+  return items.filter((item) => item.role === role);
+}
+
+function updateMessageCount(count) {
+  messageCountEl.textContent = `${t("visibleMessages")}: ${count}`;
+}
+
+function updateRoleFilterOptions() {
+  const options = [{ value: "all", label: t("filterAll") }];
+  for (const role of availableRoles) {
+    options.push({ value: role, label: roleLabel(role) });
+  }
+
+  roleFilterEl.innerHTML = "";
+  for (const option of options) {
+    const optionEl = document.createElement("option");
+    optionEl.value = option.value;
+    optionEl.textContent = option.label;
+    roleFilterEl.appendChild(optionEl);
+  }
+  roleFilterEl.value = currentRoleFilter;
+}
+
+function extractAvailableRoles(items) {
+  const roleSet = new Set();
+  for (const item of items) {
+    if (typeof item.role === "string" && item.role.trim()) {
+      roleSet.add(item.role.trim());
+    }
+  }
+  return Array.from(roleSet);
 }
